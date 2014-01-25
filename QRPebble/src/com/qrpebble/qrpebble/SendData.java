@@ -2,6 +2,7 @@ package com.qrpebble.qrpebble;
 
 import android.net.Uri;
 import android.os.Bundle;
+import android.R.integer;
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -36,8 +37,9 @@ import java.util.UUID;
 
 public class SendData extends Activity {
 
-	private static final UUID QR_UUID = UUID.fromString(("107f875b-50cf-4bf7-a90c-0caebea8bcb2").toUpperCase());
+	private static final UUID QR_UUID = UUID.fromString(("107f875b-50cf-4bf7-a90c-0caebea8bcb2"));
 	private static final int QR_DATA = 0;
+	private static final int LAST_ITEM = 1;
 	
 	TextView textLocation;
 	Button sendStuff;
@@ -123,13 +125,6 @@ public class SendData extends Activity {
 	    if (mBitmap != null) {
 	        mImageView.setImageBitmap(mBitmap);
 	        
-	        ByteArrayOutputStream stream = new ByteArrayOutputStream();
-	        mBitmap.compress(Bitmap.CompressFormat.PNG, 100, stream);
-	        byte[] byteArray = stream.toByteArray();
-	        
-	        PebbleDictionary datas = new PebbleDictionary();
-			datas.addBytes(QR_DATA, byteArray);
-			PebbleKit.sendDataToPebble(getApplicationContext(), QR_UUID, datas);
 		
 	    }
 	}
@@ -137,9 +132,9 @@ public class SendData extends Activity {
 	private void encode(String uniqueID) {
         // TODO Auto-generated method stub
          BarcodeFormat barcodeFormat = BarcodeFormat.QR_CODE;
-
-            int width0 = 105;
-            int height0 = 105;
+         
+            int width0 = 150;
+            int height0 = 150;
 
             int colorBack = 0xFF000000;
             int colorFront = 0xFFFFFFFF;
@@ -167,6 +162,56 @@ public class SendData extends Activity {
                 bitmap.setPixels(pixels, 0, width, 0, 0, width, height);
                 ImageView imageview = (ImageView)findViewById(R.id.mImageView);
                 imageview.setImageBitmap(bitmap);
+                
+                ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream);
+                byte[] byteArray = stream.toByteArray();
+                int numTimes = byteArray.length/32;
+                int remainder = byteArray.length%32;
+                
+                for(int i = 0; i < numTimes; i++)
+                {
+		        	PebbleDictionary whileData = new PebbleDictionary();
+		        	byte[] oneUnit = new byte[32];
+		        	for(int j = 0 ; j < 32; j ++)
+		        	{
+		        		oneUnit[j] = byteArray[32*i+j];
+		        	
+		        	}
+		        	whileData.addBytes(QR_DATA, oneUnit);
+		        	whileData.addUint8(LAST_ITEM, (byte)0);
+					PebbleKit.sendDataToPebble(getApplicationContext(), QR_UUID, whileData);
+					
+					 synchronized(Thread.currentThread()) { //added
+						 try {
+						            Thread.currentThread().wait(3000);
+						        } catch (InterruptedException e) {
+						            Log.e("Attractivometer","Main Thread interrupted while waiting");
+						            e.printStackTrace();
+						        }
+						 }
+
+                }
+                
+                PebbleDictionary lastData = new PebbleDictionary();
+                byte[] oneUnit = new byte[remainder];
+	        	
+                for(int j = 0 ; j < remainder; j ++)
+	        	{
+	        		oneUnit[j] = byteArray[32*numTimes+j];
+	        	}
+                
+                lastData.addBytes(QR_DATA, oneUnit);
+                lastData.addUint8(LAST_ITEM, (byte)1);
+				PebbleKit.sendDataToPebble(getApplicationContext(), QR_UUID, lastData);
+				
+                
+				Log.w("myApp", Integer.toString(byteArray.length));
+				Log.w("myApp", byteArray.toString());
+				
+				Toast.makeText(getApplicationContext(), Integer.toString(byteArray.length), 
+						   Toast.LENGTH_LONG).show();
+
             } catch (WriterException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
